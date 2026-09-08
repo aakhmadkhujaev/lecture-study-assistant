@@ -1,0 +1,1 @@
+"""Lecture-material processing components."""

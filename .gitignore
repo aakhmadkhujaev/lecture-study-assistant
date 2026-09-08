@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Environment and local secrets
+.env
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Local application data
+data/*
+!data/.gitkeep
+
+# Tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.vscode/
+data/*
+!data/.gitkeep
+lecture_study_assistant.egg-info/
