@@ -85,7 +85,7 @@ def _request_validated_guide(
     except (StructuredResponseError, SourceTraceabilityError) as error:
         repaired_response = provider.generate(
             SYSTEM_PROMPT,
-            build_repair_prompt(response, str(error)),
+            build_repair_prompt(response, str(error), source_map),
         )
         return _parse_and_validate(repaired_response, lecture_title, source_map)
 
@@ -150,11 +150,13 @@ def _used_sources(guide: StudyGuide) -> list[SourceReference]:
 
 
 def _source_map(documents: list[Document]) -> set[tuple[str, str, int]]:
-    return {
-        (document.filename, section.source_type, section.source_index)
-        for document in documents
-        for section in document.sections
-    }
+    source_map: set[tuple[str, str, int]] = set()
+    for document in documents:
+        for section in document.sections:
+            location = (document.filename, section.source_type, section.source_index)
+            source_map.add(location)
+            source_map.add((document.filename, document.material_type, section.source_index))
+    return source_map
 
 
 def _chunk_documents(
@@ -174,7 +176,12 @@ def _chunk_documents(
                 current_documents = []
                 current_size = 0
             current_documents.append(
-                Document(document.filename, document.file_type, (section,))
+                Document(
+                    document.filename,
+                    document.file_type,
+                    (section,),
+                    material_type=document.material_type,
+                )
             )
             current_size += section_size
     if current_documents:

@@ -81,7 +81,7 @@ def generate_lecture_study_guide(
 ) -> tuple[StudyGuide, Path]:
     """Extract all lecture materials, generate a guide, and save its JSON artifact."""
     lecture = get_lecture_by_id(settings, lecture_id)
-    materials = get_materials(settings, lecture.id, material_type="original")
+    materials = get_materials(settings, lecture.id)
     documents: list[Document] = []
     for material in materials:
         document = extract_material_content(settings, material.id)
@@ -90,6 +90,7 @@ def generate_lecture_study_guide(
                 filename=Path(material.stored_path).name,
                 file_type=document.file_type,
                 sections=document.sections,
+                material_type=material.material_type,
             )
         )
     active_provider = provider or GeminiProvider(settings)

@@ -22,6 +22,7 @@ class Document:
     file_type: str
     sections: tuple[Section, ...]
     extraction_method: str = "text"
+    material_type: str = "original"
 
 
 class DocumentProcessingError(Exception):

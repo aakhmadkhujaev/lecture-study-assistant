@@ -5,7 +5,9 @@ import json
 SYSTEM_PROMPT = """You are an academic study-preparation assistant.
 
 Transform only the supplied university lecture material into a concise, exam-oriented
-study guide. The source material is the complete authority: do not use outside
+study guide. Original material is the authority for what the lecture teaches. Guided
+material is user-provided support: use it to clarify or reinforce original content,
+but do not use it to introduce unrelated major lecture topics. Do not use outside
 knowledge, web research, or unstated assumptions. Never invent facts, examples,
 definitions, formulas, algorithm steps, exam predictions, or missing explanations.
 Preserve the lecture's technical terminology, notation, relationships, conditions,
@@ -50,6 +52,12 @@ Big O must remain precise. Use the lecture's actual explanation of growth with i
     describe scaling with input size. Preserve any stated precondition such as a sorted
     list, and do not add mathematical claims not supported by the source.
 
+When Original and Guided material disagree about a fact, definition, formula,
+algorithm, complexity, terminology, or course content, do not silently resolve the
+disagreement. Preserve the Original statement and record the disagreement as a
+knowledge gap/source conflict with references to both sources when possible. Never
+attribute Guided material to the professor.
+
 Return only JSON matching the requested schema, with no Markdown or extra fields.
 """
 
@@ -62,32 +70,57 @@ def build_source_prompt(lecture_title: str, documents: list[object]) -> str:
         "Apply all section rules in the system instruction. Extract supported content, but leave unsupported optional lists empty.",
         "[SOURCE MATERIAL]",
     ]
+    original_documents = [document for document in documents if document.material_type == "original"]
+    guided_documents = [document for document in documents if document.material_type == "guided"]
+    _append_material_group(parts, "ORIGINAL MATERIAL", original_documents)
+    if guided_documents:
+        parts.append("=== GUIDED MATERIAL ===")
+        parts.append(
+            "Guided material may clarify Original material but does not determine lecture scope."
+        )
+        _append_material_group(parts, "GUIDED MATERIAL", guided_documents)
+    return "\n".join(parts)
+
+
+def _append_material_group(parts: list[str], label: str, documents: list[object]) -> None:
+    parts.append(f"=== {label} ===")
     for document in documents:
         for section in document.sections:
             parts.extend(
                 [
                     "[SOURCE]",
                     f"filename={document.filename}",
+                    f"material_type={document.material_type}",
                     f"source_type={section.source_type}",
                     f"source_index={section.source_index}",
                     "TEXT:",
                     section.text,
                 ]
             )
-    return "\n".join(parts)
 
 
-def build_repair_prompt(original_response: str, error: str) -> str:
+def build_repair_prompt(
+    original_response: str,
+    error: str,
+    source_map: set[tuple[str, str, int]] | None = None,
+) -> str:
     """Ask the provider to repair only a malformed response."""
-    return "\n".join(
-        [
-            "Repair the following response so it is valid JSON matching the StudyGuide schema.",
-            "Preserve all grounded content and correct only schema or source-reference errors.",
-            f"VALIDATION ERROR:\n{error}",
-            f"ORIGINAL RESPONSE:\n{original_response}",
-            "Return JSON only.",
-        ]
-    )
+    parts = [
+        "Repair the following response so it is valid JSON matching the StudyGuide schema.",
+        "Preserve all grounded content and correct only schema or source-reference errors.",
+        f"VALIDATION ERROR:\n{error}",
+        f"ORIGINAL RESPONSE:\n{original_response}",
+    ]
+    if source_map:
+        parts.append(
+            "VALID SOURCE REFERENCES:\n"
+            + "\n".join(
+                f"filename={filename}, source_type={source_type}, source_index={source_index}"
+                for filename, source_type, source_index in sorted(source_map)
+            )
+        )
+    parts.append("Return JSON only.")
+    return "\n".join(parts)
 
 
 def build_synthesis_prompt(lecture_title: str, chunk_guides: list[object]) -> str:

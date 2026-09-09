@@ -98,6 +98,8 @@ def test_study_guide_prompt_requires_grounded_exam_oriented_extraction() -> None
     assert "must know" in system_prompt
     assert "usually 2-6" in system_prompt
     assert "only the deduplicated source locations actually used" in system_prompt
+    assert "original material is the authority" in system_prompt
+    assert "do not silently resolve" in system_prompt
     assert "Apply all section rules" in prompt
 
 
@@ -412,6 +414,68 @@ def test_multiple_materials_preserve_filename_traceability() -> None:
     assert "filename=lecture-b.pptx" in provider.prompts[0][1]
 
 
+def test_guided_material_is_labeled_and_keeps_its_source_identity() -> None:
+    original = _document("lecture.pdf")
+    guided_reference = {
+        "filename": "textbook.pdf",
+        "source_type": "guided",
+        "source_index": 1,
+    }
+    guided = Document(
+        filename="textbook.pdf",
+        file_type=".pdf",
+        sections=(Section(source_index=1, source_type="page", text="A clarifying example."),),
+        material_type="guided",
+    )
+    payload = _guide_payload()
+    payload["key_concepts"][0]["source_references"].append(guided_reference)
+    payload["sources"].append(guided_reference)
+    provider = FakeProvider([json.dumps(payload)])
+
+    guide = generate_study_guide(provider, "Lecture 01", [original, guided])
+
+    prompt = provider.prompts[0][1]
+    assert "=== ORIGINAL MATERIAL ===" in prompt
+    assert "=== GUIDED MATERIAL ===" in prompt
+    assert "filename=textbook.pdf" in prompt
+    assert "material_type=guided" in prompt
+    assert guided_reference in [source.model_dump() for source in guide.sources]
+
+
+def test_guided_only_document_is_not_labeled_as_original() -> None:
+    guided = Document(
+        filename="textbook.pdf",
+        file_type=".pdf",
+        sections=(Section(source_index=1, source_type="page", text="Supporting text."),),
+        material_type="guided",
+    )
+    guided_reference = {
+        "filename": "textbook.pdf",
+        "source_type": "guided",
+        "source_index": 1,
+    }
+    payload = _guide_payload("textbook.pdf")
+    payload["sources"] = [guided_reference]
+    payload["key_concepts"][0]["source_references"] = [guided_reference]
+    provider = FakeProvider([json.dumps(payload)])
+
+    generate_study_guide(provider, "Lecture 01", [guided])
+
+    prompt = provider.prompts[0][1]
+    assert "material_type=guided" in prompt
+    assert "=== GUIDED MATERIAL ===" in prompt
+    assert "=== ORIGINAL MATERIAL ===" in prompt
+    assert "filename=textbook.pdf\nmaterial_type=original" not in prompt
+
+
+def test_original_only_prompt_has_no_guided_material_block() -> None:
+    provider = FakeProvider([json.dumps(_guide_payload())])
+
+    generate_study_guide(provider, "Lecture 01", [_document()])
+
+    assert "=== GUIDED MATERIAL ===" not in provider.prompts[0][1]
+
+
 def test_chunking_preserves_source_markers() -> None:
     documents = [
         Document(
@@ -456,6 +520,36 @@ def test_service_generates_and_saves_guide_for_multiple_materials(tmp_path: Path
     assert "filename=second.pdf" in provider.prompts[0][1]
     with pytest.raises(StudyGuideAlreadyExistsError):
         save_study_guide(settings, lecture.id, guide)
+
+
+def test_service_assembles_current_original_and_guided_materials(tmp_path: Path) -> None:
+    settings = Settings(
+        storage_root=tmp_path / "data",
+        database_path=tmp_path / "data" / "library.db",
+        ai_api_key=None,
+        ai_model="",
+    )
+    initialize_library(settings)
+    course = create_course(settings, "Algorithms")
+    lecture = create_lecture(settings, course.id, "Lecture 01")
+    upload_material(settings, lecture.id, "lecture.pdf", _pdf_bytes("Original concept"))
+    upload_material(
+        settings,
+        lecture.id,
+        "textbook.pdf",
+        _pdf_bytes("Guided explanation"),
+        material_type="guided",
+    )
+    payload = _guide_payload()
+    provider = FakeProvider([json.dumps(payload)])
+
+    generate_lecture_study_guide(settings, lecture.id, provider=provider)
+
+    prompt = provider.prompts[0][1]
+    assert "filename=lecture.pdf" in prompt
+    assert "filename=textbook.pdf" in prompt
+    assert "material_type=original" in prompt
+    assert "material_type=guided" in prompt
 
 
 def test_duplicate_material_filenames_get_distinct_source_names(tmp_path: Path) -> None:
