@@ -13,6 +13,7 @@ from app.ai.service import (
     generate_lecture_study_guide,
     load_study_guide,
 )
+from app.pdf.service import generate_lecture_study_guide_pdf, study_guide_pdf_path
 from app.services.library_service import (
     LibraryError,
     create_course,
@@ -302,7 +303,29 @@ def _render_study_guide_controls(settings: Settings, lecture_id: int) -> None:
 
     guide = st.session_state.get(f"study-guide-{lecture_id}", saved_guide)
     if guide is not None:
+        pdf_path = study_guide_pdf_path(settings, lecture_id)
+        overwrite_pdf = False
+        if pdf_path.exists():
+            overwrite_pdf = st.checkbox(
+                "I understand that generating the PDF replaces the existing Study_Guide.pdf.",
+                key=f"confirm-regenerate-pdf-{lecture_id}",
+            )
+        if st.button("Generate PDF", key=f"generate-pdf-{lecture_id}"):
+            try:
+                generated_pdf_path = generate_lecture_study_guide_pdf(
+                    settings,
+                    lecture_id,
+                    overwrite=overwrite_pdf,
+                )
+            except FileExistsError as error:
+                st.warning(str(error))
+            except (LibraryError, StudyGuidePersistenceError, OSError) as error:
+                st.error(str(error))
+            else:
+                st.success(f"PDF saved to {generated_pdf_path}.")
         _render_study_guide(guide)
+    else:
+        st.info("Generate a Study Guide before creating its PDF.")
 
 
 def _render_study_guide(guide: StudyGuide) -> None:
