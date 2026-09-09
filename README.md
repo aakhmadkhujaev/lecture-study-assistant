@@ -17,7 +17,7 @@ The current V1 slice supports:
 - SQLite metadata for courses, lectures, and materials
 - Stable local course and lecture directories
 - Extracting content into page, slide, and ordered document sections
-- Generating validated, source-traceable JSON study guides with an OpenAI provider
+- Generating validated, source-traceable JSON study guides with Gemini
 - Local OCR fallback for image-based PDF pages and PPTX slides
 
 Planned next work includes:
@@ -97,13 +97,19 @@ Review `.env` before adding any provider configuration. Never commit `.env` or A
 
 ## Feature 3A: AI Study Guide Generator
 
-Configure the OpenAI provider in `.env`:
+The application currently uses Google's Gemini API for study-guide generation.
+Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey),
+then configure `.env`:
 
 ```text
-OPENAI_API_KEY=your-key
-AI_MODEL=your-model-name
+GEMINI_API_KEY=your-key
+GEMINI_MODEL=gemini-2.5-flash-lite
 AI_CHUNK_THRESHOLD=40000
 ```
+
+Never commit `.env` or API keys. The `.env` file is gitignored. The default model
+is a Gemini Flash model suitable for text generation and structured JSON output;
+you can select another available Gemini model with `GEMINI_MODEL`.
 
 Open a lecture and select **Generate Study Guide**. The application extracts all
 stored PDF, DOCX, and PPTX materials, sends source-marked content to the provider,
@@ -142,7 +148,7 @@ separate Feature 3A action for provider-backed generation.
 - `app/services/library_service.py` coordinates database records and local files.
 - `app/processors` contains format-specific parsers and a common structured model.
 - `app/processors/ocr.py` defines the OCR interface and local Tesseract provider.
-- `app/ai` contains the provider abstraction, OpenAI adapter, prompts, Pydantic schemas, and generator.
+- `app/ai` contains the provider abstraction, Gemini adapter, optional OpenAI adapter, prompts, Pydantic schemas, and generator.
 - `Study_Guide.json` is the canonical generated artifact for the later PDF renderer.
 - SQLite is the source of truth; the application does not scan directories to rebuild records.
 - Placeholder modules document future ownership boundaries without adding fake processing behavior.

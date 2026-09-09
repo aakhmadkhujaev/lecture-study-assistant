@@ -109,7 +109,7 @@ def _parse_and_validate(
                 "The AI returned an invalid source reference: "
                 f"{reference.filename}, {reference.source_type}, {reference.source_index}."
             )
-    return guide
+    return guide.model_copy(update={"sources": _used_sources(guide)})
 
 
 def _all_references(guide: StudyGuide) -> Iterable[SourceReference]:
@@ -125,6 +125,28 @@ def _all_references(guide: StudyGuide) -> Iterable[SourceReference]:
     ):
         for item in getattr(guide, field_name):
             yield from item.source_references
+
+
+def _used_sources(guide: StudyGuide) -> list[SourceReference]:
+    """Build the source inventory from references attached to guide content."""
+    used: list[SourceReference] = []
+    seen: set[tuple[str, str, int]] = set()
+    for field_name in (
+        "key_concepts",
+        "definitions",
+        "formulas",
+        "exam_topics",
+        "common_confusions",
+        "practice_questions",
+        "knowledge_gaps",
+    ):
+        for item in getattr(guide, field_name):
+            for reference in item.source_references:
+                key = (reference.filename, reference.source_type, reference.source_index)
+                if key not in seen:
+                    seen.add(key)
+                    used.append(reference)
+    return used
 
 
 def _source_map(documents: list[Document]) -> set[tuple[str, str, int]]:

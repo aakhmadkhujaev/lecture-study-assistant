@@ -307,8 +307,9 @@ def _render_study_guide_controls(settings: Settings, lecture_id: int) -> None:
 
 def _render_study_guide(guide: StudyGuide) -> None:
     """Display the structured guide without converting it to Markdown/PDF."""
-    st.markdown("### Lecture Overview")
-    st.write(guide.overview)
+    if guide.overview.strip():
+        st.markdown("### Lecture Overview")
+        st.write(guide.overview)
     _render_text_list("Learning Objectives", guide.learning_objectives)
     _render_concepts(guide)
     _render_definitions(guide)
@@ -318,18 +319,23 @@ def _render_study_guide(guide: StudyGuide) -> None:
     _render_questions(guide)
     _render_text_list("Quick Revision", guide.quick_revision)
     _render_gaps(guide)
-    with st.expander("Sources"):
-        for source in guide.sources:
-            st.write(f"{source.filename} - {source.source_type} {source.source_index}")
+    if guide.sources:
+        with st.expander("Sources"):
+            for source in guide.sources:
+                st.write(f"{source.filename} - {source.source_type} {source.source_index}")
 
 
 def _render_text_list(title: str, values: list[str]) -> None:
+    if not values:
+        return
     with st.expander(title, expanded=True):
         for value in values:
             st.write(f"- {value}")
 
 
 def _render_concepts(guide: StudyGuide) -> None:
+    if not guide.key_concepts:
+        return
     with st.expander("Key Concepts", expanded=True):
         for item in guide.key_concepts:
             st.markdown(f"**{item.concept}** ({item.importance})")
@@ -344,6 +350,8 @@ def _render_concepts(guide: StudyGuide) -> None:
 
 
 def _render_definitions(guide: StudyGuide) -> None:
+    if not guide.definitions:
+        return
     with st.expander("Important Definitions"):
         for item in guide.definitions:
             st.markdown(f"**{item.term}**: {item.simple_definition}")
@@ -351,6 +359,8 @@ def _render_definitions(guide: StudyGuide) -> None:
 
 
 def _render_formulas(guide: StudyGuide) -> None:
+    if not guide.formulas:
+        return
     with st.expander("Formulas & Algorithms"):
         for item in guide.formulas:
             st.markdown(f"**{item.formula}**")
@@ -359,6 +369,8 @@ def _render_formulas(guide: StudyGuide) -> None:
 
 
 def _render_exam_topics(guide: StudyGuide) -> None:
+    if not guide.exam_topics:
+        return
     with st.expander("Important for Revision"):
         for item in guide.exam_topics:
             st.markdown(f"**{item.topic}**: {item.why_important}")
@@ -366,6 +378,8 @@ def _render_exam_topics(guide: StudyGuide) -> None:
 
 
 def _render_confusions(guide: StudyGuide) -> None:
+    if not guide.common_confusions:
+        return
     with st.expander("Common Confusions"):
         for item in guide.common_confusions:
             st.markdown(f"**{item.topic}**")
@@ -375,6 +389,8 @@ def _render_confusions(guide: StudyGuide) -> None:
 
 
 def _render_questions(guide: StudyGuide) -> None:
+    if not guide.practice_questions:
+        return
     with st.expander("Practice Questions"):
         for item in guide.practice_questions:
             st.markdown(f"**{item.question_type}: {item.question}**")
@@ -383,6 +399,8 @@ def _render_questions(guide: StudyGuide) -> None:
 
 
 def _render_gaps(guide: StudyGuide) -> None:
+    if not guide.knowledge_gaps:
+        return
     with st.expander("Knowledge Gaps"):
         for item in guide.knowledge_gaps:
             st.markdown(f"**{item.topic}**")

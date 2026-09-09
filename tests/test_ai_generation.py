@@ -2,9 +2,12 @@
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
+from google import genai
+from google.genai import _common, models, types
 
 from config.settings import Settings
 
@@ -14,7 +17,10 @@ from app.ai.generator import (
     StructuredResponseError,
     generate_study_guide,
 )
+from app.ai.gemini_provider import GeminiProvider
 from app.ai.openai_provider import OpenAIProvider
+from app.ai.prompts import SYSTEM_PROMPT, build_source_prompt
+from app.ai.provider import AIConfigurationError, AIRequestError
 from app.ai.schemas import SourceReference, StudyGuide
 from app.ai.service import (
     StudyGuideAlreadyExistsError,
@@ -78,6 +84,86 @@ def _guide_payload(filename: str = "lecture.pdf", source_index: int = 1) -> dict
         "knowledge_gaps": [],
         "sources": [reference],
     }
+
+
+def test_study_guide_prompt_requires_grounded_exam_oriented_extraction() -> None:
+    prompt = build_source_prompt("Algorithms", [_document()])
+    system_prompt = " ".join(SYSTEM_PROMPT.lower().split())
+
+    assert "do not use outside knowledge" in system_prompt
+    assert "leave it as an empty list" in system_prompt
+    assert "binary search" in system_prompt
+    assert "number of operations or running time scales" in system_prompt
+    assert "must still describe scaling with input size" in system_prompt
+    assert "must know" in system_prompt
+    assert "usually 2-6" in system_prompt
+    assert "only the deduplicated source locations actually used" in system_prompt
+    assert "Apply all section rules" in prompt
+
+
+def test_mocked_supported_lecture_content_remains_traceable() -> None:
+    payload = _guide_payload()
+    reference = payload["sources"][0]
+    payload["definitions"] = [
+        {
+            "term": "Gradient descent",
+            "simple_definition": "A parameter update method.",
+            "source_references": [reference],
+        }
+    ]
+    payload["formulas"] = [
+        {
+            "formula": "O(log n)",
+            "meaning": "The lecture uses binary search on a sorted list as its example.",
+            "source_references": [reference],
+        }
+    ]
+    payload["practice_questions"] = [
+        {
+            "question_type": "formula_interpretation",
+            "question": "What complexity example does the lecture give?",
+            "model_answer": "Binary search on a sorted list is given as an O(log n) example.",
+            "source_references": [reference],
+        }
+    ]
+    provider = FakeProvider([json.dumps(payload)])
+
+    guide = generate_study_guide(provider, "Lecture 01", [_document()])
+
+    assert guide.definitions[0].term == "Gradient descent"
+    assert guide.formulas[0].formula == "O(log n)"
+    assert guide.practice_questions[0].question_type == "formula_interpretation"
+    assert guide.formulas[0].source_references[0].source_index == 1
+    assert guide.sources == [SourceReference.model_validate(reference)]
+
+
+def test_source_inventory_keeps_only_deduplicated_used_references() -> None:
+    payload = _guide_payload()
+    used_reference = payload["sources"][0]
+    unused_reference = {
+        "filename": "lecture.pdf",
+        "source_type": "page",
+        "source_index": 2,
+    }
+    payload["sources"] = [used_reference, unused_reference, used_reference]
+    documents = [
+        _document(),
+        Document(
+            filename="lecture.pdf",
+            file_type=".pdf",
+            sections=(Section(source_index=2, source_type="page", text="Context only."),),
+        ),
+    ]
+    provider = FakeProvider([json.dumps(payload)])
+
+    guide = generate_study_guide(provider, "Lecture 01", documents)
+
+    assert [(source.filename, source.source_index) for source in guide.sources] == [
+        ("lecture.pdf", 1)
+    ]
+    assert guide.key_concepts[0].source_references == [
+        SourceReference.model_validate(used_reference)
+    ]
 
 
 def test_source_reference_validation() -> None:
@@ -153,6 +239,155 @@ def test_missing_openai_configuration_is_clear() -> None:
         OpenAIProvider(settings)
 
 
+def test_gemini_provider_generates_structured_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeModels:
+        def __init__(self) -> None:
+            self.request = None
+
+        def generate_content(self, **kwargs: object) -> SimpleNamespace:
+            self.request = kwargs
+            return SimpleNamespace(text=json.dumps(_guide_payload()))
+
+    fake_models = FakeModels()
+    monkeypatch.setattr(
+        "app.ai.gemini_provider.genai.Client",
+        lambda api_key: SimpleNamespace(models=fake_models),
+    )
+    settings = Settings(
+        storage_root=Path("data"),
+        database_path=Path("data/test.db"),
+        ai_api_key="gemini-key",
+        gemini_api_key="gemini-key",
+        ai_model="gemini-test-model",
+    )
+
+    guide = generate_study_guide(
+        GeminiProvider(settings), "Lecture 01", [_document()]
+    )
+
+    assert guide.lecture_title == "Lecture 01"
+    assert fake_models.request is not None
+    assert fake_models.request["model"] == "gemini-test-model"
+    config = fake_models.request["config"]
+    assert config.response_mime_type == "application/json"
+    assert config.response_json_schema["type"] == "object"
+    assert "additionalProperties" not in config.response_json_schema
+    assert "additional_properties" not in config.response_json_schema
+
+
+def test_gemini_serialized_schema_has_no_unsupported_additional_properties(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeModels:
+        def generate_content(self, **kwargs: object) -> SimpleNamespace:
+            self.request = kwargs
+            return SimpleNamespace(text=json.dumps(_guide_payload()))
+
+    sdk_client = genai.Client(api_key="test-key")
+    fake_models = FakeModels()
+    monkeypatch.setattr(
+        "app.ai.gemini_provider.genai.Client",
+        lambda api_key: SimpleNamespace(models=fake_models),
+    )
+    settings = Settings(
+        storage_root=Path("data"),
+        database_path=Path("data/test.db"),
+        ai_api_key="gemini-key",
+        gemini_api_key="gemini-key",
+        ai_model="gemini-test-model",
+    )
+
+    GeminiProvider(settings).generate("system", "user")
+    config = fake_models.request["config"]
+    parameters = types._GenerateContentParameters(
+        model="gemini-test-model",
+        contents="user",
+        config=config,
+    )
+    request = models._GenerateContentParameters_to_mldev(
+        sdk_client._api_client,
+        parameters,
+        None,
+        parameters,
+    )
+    request.pop("config", None)
+    wire_request = _common.encode_unserializable_types(
+        _common.convert_to_dict(request)
+    )
+    serialized_schema = json.dumps(wire_request["generationConfig"]["responseJsonSchema"])
+
+    assert "additional_properties" not in serialized_schema
+    assert "additionalProperties" not in serialized_schema
+    assert "key_concepts" in serialized_schema
+    assert "source_references" in serialized_schema
+    assert '"items"' in serialized_schema
+
+
+def test_missing_gemini_configuration_is_clear() -> None:
+    settings = Settings(
+        storage_root=Path("data"),
+        database_path=Path("data/test.db"),
+        ai_api_key=None,
+        gemini_api_key=None,
+        ai_model="gemini-test-model",
+    )
+
+    with pytest.raises(AIConfigurationError, match="GEMINI_API_KEY"):
+        GeminiProvider(settings)
+
+
+def test_gemini_provider_maps_api_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def failing_client(api_key: str) -> SimpleNamespace:
+        raise RuntimeError("quota exceeded")
+
+    monkeypatch.setattr("app.ai.gemini_provider.genai.Client", failing_client)
+    settings = Settings(
+        storage_root=Path("data"),
+        database_path=Path("data/test.db"),
+        ai_api_key="gemini-key",
+        gemini_api_key="gemini-key",
+        ai_model="gemini-test-model",
+    )
+
+    with pytest.raises(AIRequestError, match="quota exceeded"):
+        GeminiProvider(settings)
+
+
+def test_gemini_provider_maps_request_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FailingModels:
+        def generate_content(self, **kwargs: object) -> None:
+            raise RuntimeError("network failure")
+
+    monkeypatch.setattr(
+        "app.ai.gemini_provider.genai.Client",
+        lambda api_key: SimpleNamespace(models=FailingModels()),
+    )
+    settings = Settings(
+        storage_root=Path("data"),
+        database_path=Path("data/test.db"),
+        ai_api_key="gemini-key",
+        gemini_api_key="gemini-key",
+        ai_model="gemini-test-model",
+    )
+
+    with pytest.raises(AIRequestError, match="network failure"):
+        GeminiProvider(settings).generate("system", "user")
+
+
+def test_gemini_model_configuration_loads_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from config.settings import get_settings
+
+    monkeypatch.setenv("GEMINI_API_KEY", "configured-key")
+    monkeypatch.setenv("GEMINI_MODEL", "configured-model")
+
+    settings = get_settings()
+
+    assert settings.gemini_api_key == "configured-key"
+    assert settings.ai_model == "configured-model"
+
+
 def test_multiple_materials_preserve_filename_traceability() -> None:
     first = _document("lecture-a.pdf")
     second = Document(
@@ -161,9 +396,11 @@ def test_multiple_materials_preserve_filename_traceability() -> None:
         sections=(Section(source_index=2, source_type="slide", text="Algorithm steps."),),
     )
     payload = _guide_payload("lecture-a.pdf")
-    payload["sources"].append(
-        {"filename": "lecture-b.pptx", "source_type": "slide", "source_index": 2}
-    )
+    second_reference = {
+        "filename": "lecture-b.pptx", "source_type": "slide", "source_index": 2
+    }
+    payload["sources"].append(second_reference)
+    payload["key_concepts"][0]["source_references"].append(second_reference)
     provider = FakeProvider([json.dumps(payload)])
 
     guide = generate_study_guide(provider, "Lecture 01", [first, second])

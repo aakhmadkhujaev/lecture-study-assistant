@@ -126,7 +126,7 @@ def test_empty_pdf_is_reported_as_non_extractable(tmp_path: Path) -> None:
     document.save(path)
     document.close()
 
-    with pytest.raises(EmptyDocumentError, match="scanned or image-based"):
+    with pytest.raises(EmptyDocumentError, match="OCR could not detect readable content"):
         PDFProcessor().process(path)
 
 

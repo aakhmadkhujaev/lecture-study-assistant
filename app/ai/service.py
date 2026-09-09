@@ -6,7 +6,7 @@ from pathlib import Path
 from config.settings import Settings
 
 from app.ai.generator import generate_study_guide
-from app.ai.openai_provider import OpenAIProvider
+from app.ai.gemini_provider import GeminiProvider
 from app.ai.provider import LLMProvider
 from app.ai.schemas import StudyGuide
 from app.processors.models import Document
@@ -92,7 +92,7 @@ def generate_lecture_study_guide(
                 sections=document.sections,
             )
         )
-    active_provider = provider or OpenAIProvider(settings)
+    active_provider = provider or GeminiProvider(settings)
     guide = generate_study_guide(
         active_provider,
         lecture.title,
