@@ -28,6 +28,8 @@ CREATE TABLE IF NOT EXISTS materials (
     original_filename TEXT NOT NULL,
     stored_path TEXT NOT NULL UNIQUE,
     uploaded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    material_type TEXT NOT NULL DEFAULT 'original'
+        CHECK (material_type IN ('original', 'guided')),
     FOREIGN KEY (lecture_id) REFERENCES lectures (id) ON DELETE CASCADE
 );
 
@@ -54,6 +56,18 @@ def get_connection(database_path: Path) -> Iterator[sqlite3.Connection]:
 
 
 def initialize_database(database_path: Path) -> None:
-    """Create the library schema if it does not already exist."""
+    """Create the library schema and migrate existing material records."""
     with get_connection(database_path) as connection:
         connection.executescript(SCHEMA)
+        columns = {
+            row["name"]
+            for row in connection.execute("PRAGMA table_info(materials)").fetchall()
+        }
+        if "material_type" not in columns:
+            connection.execute(
+                """
+                ALTER TABLE materials
+                ADD COLUMN material_type TEXT NOT NULL DEFAULT 'original'
+                    CHECK (material_type IN ('original', 'guided'))
+                """
+            )

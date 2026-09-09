@@ -28,9 +28,10 @@ def ensure_lecture_directory(
     course_name: str,
     lecture_name: str,
 ) -> Path:
-    """Create or reuse a lecture directory and its Original subdirectory."""
+    """Create or reuse a lecture directory and both material directories."""
     directory = lecture_directory(storage_root, course_name, lecture_name)
     (directory / "Original").mkdir(parents=True, exist_ok=True)
+    (directory / "Guided_Material").mkdir(parents=True, exist_ok=True)
     return directory
 
 
@@ -40,6 +41,7 @@ def store_material(
     lecture_name: str,
     original_filename: str,
     content: bytes,
+    material_type: str = "original",
 ) -> str:
     """Store content without overwriting an existing filename.
 
@@ -50,8 +52,13 @@ def store_material(
     if not filename or filename in {".", ".."}:
         raise ValueError("Uploaded file must have a valid filename.")
 
-    original_directory = directory / "Original"
-    candidate = original_directory / filename
+    if material_type not in {"original", "guided"}:
+        raise ValueError("Material type must be 'original' or 'guided'.")
+    material_directory = directory / (
+        "Original" if material_type == "original" else "Guided_Material"
+    )
+    material_directory.mkdir(parents=True, exist_ok=True)
+    candidate = material_directory / filename
     counter = 1
     while True:
         try:
@@ -59,7 +66,7 @@ def store_material(
                 output_file.write(content)
             break
         except FileExistsError:
-            candidate = original_directory / (
+            candidate = material_directory / (
                 f"{Path(filename).stem} ({counter}){Path(filename).suffix}"
             )
             counter += 1

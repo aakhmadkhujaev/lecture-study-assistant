@@ -81,7 +81,7 @@ def generate_lecture_study_guide(
 ) -> tuple[StudyGuide, Path]:
     """Extract all lecture materials, generate a guide, and save its JSON artifact."""
     lecture = get_lecture_by_id(settings, lecture_id)
-    materials = get_materials(settings, lecture.id)
+    materials = get_materials(settings, lecture.id, material_type="original")
     documents: list[Document] = []
     for material in materials:
         document = extract_material_content(settings, material.id)

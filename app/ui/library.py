@@ -181,31 +181,8 @@ def _render_lecture_page(settings: Settings) -> None:
 
     _render_study_guide_controls(settings, lecture.id)
 
-    st.subheader("Existing materials")
-    if not materials:
-        st.info("No materials have been uploaded for this lecture yet.")
-    else:
-        for material in materials:
-            material_column, action_column = st.columns([3, 1])
-            material_column.write(material.original_filename)
-            st.caption(material.stored_path)
-            if action_column.button(
-                "Extract Content",
-                key=f"extract-material-{material.id}",
-            ):
-                try:
-                    document = extract_material_content(settings, material.id)
-                except LibraryError as error:
-                    st.error(f"{material.original_filename}: {error}")
-                else:
-                    st.session_state["extracted_document"] = document
-                    st.session_state["extracted_material_id"] = material.id
-                    method = document.extraction_method
-                    if method == "ocr":
-                        st.info(
-                            "Text extraction found no readable text for part of this material. OCR was used."
-                        )
-                    st.rerun()
+    _render_material_category(settings, lecture.id, materials, "original", "Original Material")
+    _render_material_category(settings, lecture.id, materials, "guided", "Guided Material")
 
     extracted_document = st.session_state.get("extracted_document")
     extracted_material_id = st.session_state.get("extracted_material_id")
@@ -222,30 +199,8 @@ def _render_lecture_page(settings: Settings) -> None:
             with st.expander(source_label, expanded=True):
                 st.text(section.text)
 
-    st.subheader("Upload Materials")
-    uploaded_files = st.file_uploader(
-        "Choose PDF, DOCX, or PPTX files",
-        type=["pdf", "docx", "pptx"],
-        accept_multiple_files=True,
-        key=f"upload-materials-{lecture.id}",
-    )
-    if uploaded_files and st.button("Save Materials", key=f"save-materials-{lecture.id}"):
-        saved_count = 0
-        for uploaded_file in uploaded_files:
-            try:
-                upload_material(
-                    settings,
-                    lecture.id,
-                    uploaded_file.name,
-                    uploaded_file.getvalue(),
-                )
-            except LibraryError as error:
-                st.error(f"{uploaded_file.name}: {error}")
-            else:
-                saved_count += 1
-        if saved_count:
-            st.success(f"Saved {saved_count} material(s).")
-            st.rerun()
+    _render_material_uploader(settings, lecture.id, "original", "Upload Original")
+    _render_material_uploader(settings, lecture.id, "guided", "Upload Guided Material")
 
     st.divider()
     st.subheader("Delete lecture")
@@ -326,6 +281,77 @@ def _render_study_guide_controls(settings: Settings, lecture_id: int) -> None:
         _render_study_guide(guide)
     else:
         st.info("Generate a Study Guide before creating its PDF.")
+
+
+def _render_material_category(
+    settings: Settings,
+    lecture_id: int,
+    materials: list[object],
+    material_type: str,
+    title: str,
+) -> None:
+    st.subheader(title)
+    category_materials = [item for item in materials if item.material_type == material_type]
+    if not category_materials:
+        st.info(f"No {material_type} materials have been uploaded for this lecture.")
+        return
+    for material in category_materials:
+        material_column, action_column = st.columns([3, 1])
+        material_column.write(material.original_filename)
+        material_column.caption(f"{material.material_type.title()} • {material.stored_path}")
+        if action_column.button(
+            "Extract Content",
+            key=f"extract-material-{material.id}",
+        ):
+            try:
+                document = extract_material_content(settings, material.id)
+            except LibraryError as error:
+                st.error(f"{material.original_filename}: {error}")
+            else:
+                st.session_state["extracted_document"] = document
+                st.session_state["extracted_material_id"] = material.id
+                method = document.extraction_method
+                if method == "ocr":
+                    st.info(
+                        "Text extraction found no readable text for part of this material. OCR was used."
+                    )
+                st.rerun()
+
+
+def _render_material_uploader(
+    settings: Settings,
+    lecture_id: int,
+    material_type: str,
+    label: str,
+) -> None:
+    uploaded_files = st.file_uploader(
+        f"{label}: choose PDF, DOCX, or PPTX files",
+        type=["pdf", "docx", "pptx"],
+        accept_multiple_files=True,
+        key=f"upload-{material_type}-materials-{lecture_id}",
+    )
+    if not uploaded_files or not st.button(
+        label,
+        key=f"save-{material_type}-materials-{lecture_id}",
+    ):
+        return
+    saved_count = 0
+    for uploaded_file in uploaded_files:
+        try:
+            upload_material(
+                settings,
+                lecture_id,
+                uploaded_file.name,
+                uploaded_file.getvalue(),
+                material_type=material_type,
+            )
+        except LibraryError as error:
+            st.error(f"{uploaded_file.name}: {error}")
+        else:
+            saved_count += 1
+    if saved_count:
+        st.success(f"Saved {saved_count} {material_type} material(s).")
+        st.rerun()
 
 
 def _render_study_guide(guide: StudyGuide) -> None:

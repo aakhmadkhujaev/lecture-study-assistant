@@ -25,6 +25,7 @@ def _material_from_row(row: sqlite3.Row) -> Material:
         original_filename=row["original_filename"],
         stored_path=row["stored_path"],
         uploaded_at=row["uploaded_at"],
+        material_type=row["material_type"],
     )
 
 
@@ -96,7 +97,7 @@ def insert_lecture(
 def list_materials(connection: sqlite3.Connection, lecture_id: int) -> list[Material]:
     rows = connection.execute(
         """
-        SELECT id, lecture_id, original_filename, stored_path, uploaded_at
+        SELECT id, lecture_id, original_filename, stored_path, uploaded_at, material_type
         FROM materials
         WHERE lecture_id = ?
         ORDER BY uploaded_at, id
@@ -109,7 +110,7 @@ def list_materials(connection: sqlite3.Connection, lecture_id: int) -> list[Mate
 def get_material(connection: sqlite3.Connection, material_id: int) -> Material | None:
     row = connection.execute(
         """
-        SELECT id, lecture_id, original_filename, stored_path, uploaded_at
+        SELECT id, lecture_id, original_filename, stored_path, uploaded_at, material_type
         FROM materials
         WHERE id = ?
         """,
@@ -123,17 +124,20 @@ def insert_material(
     lecture_id: int,
     original_filename: str,
     stored_path: str,
+    material_type: str = "original",
 ) -> Material:
     cursor = connection.execute(
         """
-        INSERT INTO materials (lecture_id, original_filename, stored_path)
-        VALUES (?, ?, ?)
+        INSERT INTO materials (
+            lecture_id, original_filename, stored_path, material_type
+        )
+        VALUES (?, ?, ?, ?)
         """,
-        (lecture_id, original_filename, stored_path),
+        (lecture_id, original_filename, stored_path, material_type),
     )
     row = connection.execute(
         """
-        SELECT id, lecture_id, original_filename, stored_path, uploaded_at
+        SELECT id, lecture_id, original_filename, stored_path, uploaded_at, material_type
         FROM materials
         WHERE id = ?
         """,

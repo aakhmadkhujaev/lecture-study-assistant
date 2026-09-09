@@ -31,3 +31,4 @@ class Material:
     original_filename: str
     stored_path: str
     uploaded_at: str
+    material_type: str = "original"

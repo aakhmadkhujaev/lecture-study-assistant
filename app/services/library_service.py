@@ -31,6 +31,7 @@ from app.processors.models import Document, DocumentProcessingError
 from app.processors.ocr import OCRProvider
 
 ALLOWED_MATERIAL_EXTENSIONS = {".pdf", ".docx", ".pptx"}
+ALLOWED_MATERIAL_TYPES = {"original", "guided"}
 
 
 class LibraryError(Exception):
@@ -199,11 +200,18 @@ def delete_lecture(settings: Settings, lecture_id: int) -> None:
         raise LibraryError(f"Could not delete the lecture: {error}") from error
 
 
-def get_materials(settings: Settings, lecture_id: int) -> list[Material]:
+def get_materials(
+    settings: Settings,
+    lecture_id: int,
+    material_type: str | None = None,
+) -> list[Material]:
     """Return materials for a lecture from SQLite."""
     try:
         with get_connection(settings.database_path) as connection:
-            return list_materials(connection, lecture_id)
+            materials = list_materials(connection, lecture_id)
+            if material_type is not None:
+                materials = [item for item in materials if item.material_type == material_type]
+            return materials
     except sqlite3.Error as error:
         raise PersistenceError(f"Could not load materials: {error}") from error
 
@@ -241,6 +249,7 @@ def upload_material(
     lecture_id: int,
     original_filename: str,
     content: bytes | BinaryIO,
+    material_type: str = "original",
 ) -> Material:
     """Store one supported material and persist its metadata."""
     extension = Path(original_filename).suffix.lower()
@@ -249,6 +258,8 @@ def upload_material(
         raise UnsupportedMaterialError(
             f"Unsupported file type. Supported types are: {allowed}."
         )
+    if material_type not in ALLOWED_MATERIAL_TYPES:
+        raise LibraryError("Material type must be 'original' or 'guided'.")
 
     lecture = get_lecture_by_id(settings, lecture_id)
     course = get_course_by_id(settings, lecture.course_id)
@@ -263,6 +274,7 @@ def upload_material(
             lecture.title,
             original_filename,
             file_content,
+            material_type,
         )
     except (OSError, ValueError) as error:
         raise FileStorageError(f"Could not store the uploaded file: {error}") from error
@@ -274,6 +286,7 @@ def upload_material(
                 lecture.id,
                 original_filename,
                 stored_path,
+                material_type,
             )
     except sqlite3.Error as error:
         stored_file = settings.storage_root / stored_path
