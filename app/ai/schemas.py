@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SourceReference(BaseModel):
@@ -94,6 +94,56 @@ class KnowledgeGap(BaseModel):
     source_references: list[SourceReference]
 
 
+DiagramType = Literal[
+    "flow",
+    "concept_map",
+    "hierarchy",
+    "process",
+    "comparison",
+    "complexity",
+    "data_structure",
+]
+
+
+class VisualNode(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    label: str
+
+
+class VisualRelationship(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    target: str
+    label: str | None = None
+
+
+class VisualModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    purpose: str
+    diagram_type: DiagramType
+    nodes: list[VisualNode]
+    relationships: list[VisualRelationship]
+    explanation: str
+    source_references: list[SourceReference]
+
+    @model_validator(mode="after")
+    def relationships_reference_nodes(self) -> "VisualModel":
+        node_ids = {node.id for node in self.nodes}
+        invalid = [
+            relationship
+            for relationship in self.relationships
+            if relationship.source not in node_ids or relationship.target not in node_ids
+        ]
+        if invalid:
+            raise ValueError("Visual relationships must reference existing node ids.")
+        return self
+
+
 class StudyGuide(BaseModel):
     """Canonical structured study guide artifact."""
 
@@ -110,4 +160,5 @@ class StudyGuide(BaseModel):
     practice_questions: list[PracticeQuestion]
     quick_revision: list[str]
     knowledge_gaps: list[KnowledgeGap]
+    visual_models: list[VisualModel] = Field(default_factory=list)
     sources: list[SourceReference]

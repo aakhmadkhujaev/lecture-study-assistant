@@ -42,6 +42,17 @@ Section rules:
     to understand later lecture material, Important for useful supporting concepts, and
     Supporting for secondary or contextual material. Never say a topic will be on the
     exam unless the lecture explicitly says so.
+- visual_models: generate an optional visual explanation only when it materially
+    improves the learner's mental model. A visual explanation is a simple,
+    source-grounded diagram of relationships, structure, flow, hierarchy, process,
+    comparison, or complexity; it is not a decorative illustration. Use only the
+    diagram types flow, concept_map, hierarchy, process, comparison, complexity, or
+    data_structure. Keep the number small, the diagrams readable and exam-oriented,
+    and avoid excessive nodes or relationships. Ground every node, relationship,
+    label, explanation, and source reference in the supplied material. Do not invent
+    technical details. For complexity, describe how operation count or runtime grows
+    as input size changes; binary search may illustrate O(log n), but it does not
+    define Big O.
 
 Big O must remain precise. Use the lecture's actual explanation of growth with input
     size and its stated examples. Define each complexity class in terms of how the

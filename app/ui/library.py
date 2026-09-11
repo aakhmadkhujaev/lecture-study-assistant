@@ -29,6 +29,7 @@ from app.services.library_service import (
     initialize_library,
     upload_material,
 )
+from app.visuals.renderer import render_visual_text
 
 
 def render_library(settings: Settings) -> None:
@@ -368,10 +369,23 @@ def _render_study_guide(guide: StudyGuide) -> None:
     _render_questions(guide)
     _render_text_list("Quick Revision", guide.quick_revision)
     _render_gaps(guide)
+    _render_visual_models(guide)
     if guide.sources:
         with st.expander("Sources"):
             for source in guide.sources:
                 st.write(f"{source.filename} - {source.source_type} {source.source_index}")
+
+
+def _render_visual_models(guide: StudyGuide) -> None:
+    if not guide.visual_models:
+        return
+    st.subheader("Visual Mental Models")
+    for visual in guide.visual_models:
+        with st.expander(visual.title, expanded=True):
+            st.write(f"Purpose: {visual.purpose}")
+            st.code(render_visual_text(visual), language="text")
+            st.write(visual.explanation)
+            _render_references(visual.source_references)
 
 
 def _render_text_list(title: str, values: list[str]) -> None:

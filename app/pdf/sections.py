@@ -5,6 +5,7 @@ from reportlab.lib import colors
 from reportlab.lib.units import mm
 
 from app.ai.schemas import StudyGuide
+from app.visuals.renderer import render_visual_flowables
 
 from app.pdf.styles import ANSWER_STYLE, QUESTION_STYLE, SUBSECTION_STYLE
 from app.pdf.utils import add_reference, bullet_items, paragraph, section_heading
@@ -125,6 +126,15 @@ def render_knowledge_gaps(guide: StudyGuide) -> list[object]:
     return story
 
 
+def render_visual_models(guide: StudyGuide) -> list[object]:
+    if not guide.visual_models:
+        return []
+    story: list[object] = [section_heading("Visual Mental Models")]
+    for visual in guide.visual_models:
+        story.extend(render_visual_flowables(visual))
+    return story
+
+
 def render_sources(guide: StudyGuide) -> list[object]:
     if not guide.sources:
         return []
@@ -148,5 +158,4 @@ def render_sources(guide: StudyGuide) -> list[object]:
 
 def _priority_label(value: str) -> str:
     return {"must_know": "Must Know", "important": "Important", "supporting": "Supporting"}.get(value, value)
-
 

@@ -114,6 +114,8 @@ def _parse_and_validate(
 
 def _all_references(guide: StudyGuide) -> Iterable[SourceReference]:
     yield from guide.sources
+    for visual in guide.visual_models:
+        yield from visual.source_references
     for field_name in (
         "key_concepts",
         "definitions",
@@ -131,6 +133,12 @@ def _used_sources(guide: StudyGuide) -> list[SourceReference]:
     """Build the source inventory from references attached to guide content."""
     used: list[SourceReference] = []
     seen: set[tuple[str, str, int]] = set()
+    for visual in guide.visual_models:
+        for reference in visual.source_references:
+            key = (reference.filename, reference.source_type, reference.source_index)
+            if key not in seen:
+                seen.add(key)
+                used.append(reference)
     for field_name in (
         "key_concepts",
         "definitions",

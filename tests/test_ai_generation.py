@@ -139,6 +139,57 @@ def test_mocked_supported_lecture_content_remains_traceable() -> None:
     assert guide.sources == [SourceReference.model_validate(reference)]
 
 
+def test_visual_references_are_validated_and_added_to_used_sources() -> None:
+    payload = _guide_payload()
+    reference = payload["sources"][0]
+    payload["visual_models"] = [
+        {
+            "title": "Gradient descent flow",
+            "purpose": "Show the update sequence.",
+            "diagram_type": "process",
+            "nodes": [
+                {"id": "gradient", "label": "Gradient"},
+                {"id": "update", "label": "Update"},
+            ],
+            "relationships": [
+                {"source": "gradient", "target": "update", "label": "drives"}
+            ],
+            "explanation": "The gradient drives the parameter update.",
+            "source_references": [reference, reference],
+        }
+    ]
+    provider = FakeProvider([json.dumps(payload)])
+
+    guide = generate_study_guide(provider, "Lecture 01", [_document()])
+
+    assert guide.visual_models[0].title == "Gradient descent flow"
+    assert guide.sources == [SourceReference.model_validate(reference)]
+
+
+def test_invalid_visual_reference_uses_existing_repair_flow() -> None:
+    invalid = _guide_payload()
+    invalid["visual_models"] = [
+        {
+            "title": "Unsupported flow",
+            "purpose": "Show a flow.",
+            "diagram_type": "flow",
+            "nodes": [{"id": "a", "label": "A"}],
+            "relationships": [],
+            "explanation": "A simple flow.",
+            "source_references": [
+                {"filename": "missing.pdf", "source_type": "page", "source_index": 1}
+            ],
+        }
+    ]
+    valid = _guide_payload()
+    provider = FakeProvider([json.dumps(invalid), json.dumps(valid)])
+
+    generate_study_guide(provider, "Lecture 01", [_document()])
+
+    assert len(provider.prompts) == 2
+    assert "invalid source reference" in provider.prompts[1][1].lower()
+
+
 def test_source_inventory_keeps_only_deduplicated_used_references() -> None:
     payload = _guide_payload()
     used_reference = payload["sources"][0]

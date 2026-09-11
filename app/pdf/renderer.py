@@ -20,6 +20,7 @@ from app.pdf.sections import (
     render_quick_revision,
     render_revision_priorities,
     render_sources,
+    render_visual_models,
 )
 from app.pdf.styles import FONT_NAME, METADATA_LABEL_STYLE, PAGE_MARGINS, PAGE_SIZE, SUBTITLE_STYLE, TITLE_STYLE
 from app.pdf.utils import paragraph
@@ -95,6 +96,7 @@ def _build_story(study_guide: StudyGuide, output_path: Path, course_name: str | 
         render_practice_questions,
         render_quick_revision,
         render_knowledge_gaps,
+        render_visual_models,
         render_sources,
     ):
         story.extend(renderer(study_guide))
