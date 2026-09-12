@@ -12,9 +12,9 @@ from app.pdf.utils import add_reference, bullet_items, paragraph, section_headin
 
 
 def render_lecture_overview(guide: StudyGuide) -> list[object]:
-    if not guide.overview.strip():
+    if not guide.lecture_overview.strip():
         return []
-    return [section_heading("Lecture Overview"), paragraph(guide.overview)]
+    return [section_heading("Lecture Overview"), paragraph(guide.lecture_overview)]
 
 
 def render_learning_objectives(guide: StudyGuide) -> list[object]:
@@ -23,18 +23,44 @@ def render_learning_objectives(guide: StudyGuide) -> list[object]:
     return [section_heading("Learning Objectives"), *bullet_items(guide.learning_objectives)]
 
 
+def render_mental_model(guide: StudyGuide) -> list[object]:
+    mental_model = guide.mental_model
+    if not _has_meaningful_content(
+        mental_model.core_idea,
+        mental_model.components,
+        mental_model.relationships,
+        mental_model.how_it_works,
+        mental_model.key_takeaway,
+    ):
+        return []
+    story: list[object] = [section_heading("Mental Model")]
+    if mental_model.core_idea.strip():
+        story.extend([paragraph("Core idea", SUBSECTION_STYLE), paragraph(mental_model.core_idea)])
+    if mental_model.components:
+        story.extend([paragraph("Components", SUBSECTION_STYLE), *bullet_items(_meaningful_items(mental_model.components))])
+    if mental_model.relationships:
+        story.extend([paragraph("Relationships", SUBSECTION_STYLE), *bullet_items(_meaningful_items(mental_model.relationships))])
+    if mental_model.how_it_works.strip():
+        story.extend([paragraph("How it works", SUBSECTION_STYLE), paragraph(mental_model.how_it_works)])
+    if mental_model.key_takeaway.strip():
+        story.extend([paragraph("Key takeaway", SUBSECTION_STYLE), paragraph(mental_model.key_takeaway)])
+    return story
+
+
 def render_key_concepts(guide: StudyGuide) -> list[object]:
     if not guide.key_concepts:
         return []
     story: list[object] = [section_heading("Key Concepts")]
     for item in guide.key_concepts:
-        content: list[object] = [paragraph(f"{item.concept} ({_priority_label(item.importance)})", SUBSECTION_STYLE)]
-        content.append(paragraph(item.simple_explanation))
-        content.extend(bullet_items(item.important_points))
+        content: list[object] = [paragraph(f"{item.name} ({_priority_label(item.importance)})", SUBSECTION_STYLE)]
+        content.append(paragraph(item.definition))
+        content.append(paragraph(item.explanation))
         if item.example:
             content.append(paragraph(f"Example: {item.example}"))
-        if item.remember:
-            content.append(paragraph(f"Remember: {item.remember}"))
+        if item.use_when:
+            content.append(paragraph(f"Use when: {item.use_when}"))
+        if item.avoid_when:
+            content.append(paragraph(f"Avoid when: {item.avoid_when}"))
         add_reference(content, item.source_references)
         story.append(KeepTogether(content))
     return story
@@ -62,6 +88,62 @@ def render_formulas_algorithms(guide: StudyGuide) -> list[object]:
     return story
 
 
+def render_real_world_applications(guide: StudyGuide) -> list[object]:
+    applications = [
+        application
+        for application in guide.real_world_applications
+        if _has_meaningful_content(
+            application.title,
+            application.problem,
+            application.solution,
+            application.why_this_concept,
+            application.impact,
+        )
+    ]
+    if not applications:
+        return []
+    story: list[object] = [section_heading("Real-World Applications")]
+    for application in applications:
+        content = [paragraph(application.title, SUBSECTION_STYLE)]
+        content.extend([
+            paragraph(f"Problem: {application.problem}"),
+            paragraph(f"Solution: {application.solution}"),
+            paragraph(f"Why this concept: {application.why_this_concept}"),
+            paragraph(f"Impact: {application.impact}"),
+        ])
+        add_reference(content, application.source_references)
+        story.append(KeepTogether(content))
+    return story
+
+
+def render_engineering_connections(guide: StudyGuide) -> list[object]:
+    connections = [
+        connection
+        for connection in guide.engineering_connections
+        if _has_meaningful_content(
+            connection.concept,
+            connection.real_world_problem,
+            connection.engineering_decision,
+            connection.implementation,
+            connection.trade_offs,
+        )
+    ]
+    if not connections:
+        return []
+    story: list[object] = [section_heading("Engineering Connections")]
+    for connection in connections:
+        content = [paragraph(connection.concept, SUBSECTION_STYLE)]
+        content.extend([
+            paragraph(f"Real-world problem: {connection.real_world_problem}"),
+            paragraph(f"Engineering decision: {connection.engineering_decision}"),
+            paragraph(f"Implementation: {connection.implementation}"),
+            paragraph(f"Trade-offs: {connection.trade_offs}"),
+        ])
+        add_reference(content, connection.source_references)
+        story.append(KeepTogether(content))
+    return story
+
+
 def render_revision_priorities(guide: StudyGuide) -> list[object]:
     if not guide.key_concepts and not guide.exam_topics:
         return []
@@ -72,7 +154,7 @@ def render_revision_priorities(guide: StudyGuide) -> list[object]:
             continue
         story.append(paragraph(_priority_label(importance), SUBSECTION_STYLE))
         for item in items:
-            content = [paragraph(item.concept, QUESTION_STYLE), paragraph(item.simple_explanation)]
+            content = [paragraph(item.name, QUESTION_STYLE), paragraph(item.definition)]
             add_reference(content, item.source_references)
             story.append(KeepTogether(content))
     if guide.exam_topics:
@@ -158,4 +240,15 @@ def render_sources(guide: StudyGuide) -> list[object]:
 
 def _priority_label(value: str) -> str:
     return {"must_know": "Must Know", "important": "Important", "supporting": "Supporting"}.get(value, value)
+
+
+def _has_meaningful_content(*values: str | list[str]) -> bool:
+    return any(
+        value.strip() if isinstance(value, str) else any(item.strip() for item in value)
+        for value in values
+    )
+
+
+def _meaningful_items(values: list[str]) -> list[str]:
+    return [value for value in values if value.strip()]
 

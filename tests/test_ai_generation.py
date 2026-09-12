@@ -100,6 +100,14 @@ def test_study_guide_prompt_requires_grounded_exam_oriented_extraction() -> None
     assert "only the deduplicated source locations actually used" in system_prompt
     assert "original material is the authority" in system_prompt
     assert "do not silently resolve" in system_prompt
+    assert "generic input -> process -> output" in system_prompt
+    assert "0-4 visuals" in system_prompt
+    assert "difference in strategy, operations, or growth" in system_prompt
+    assert "data structure -> operations -> efficiency" in system_prompt
+    assert "linear search versus binary search" in system_prompt
+    assert "list/dict/set/tuple trade-offs" in system_prompt
+    assert "prefer them over a generic algorithm shape" in system_prompt
+    assert "not a decorative illustration" in system_prompt
     assert "Apply all section rules" in prompt
 
 
@@ -260,12 +268,12 @@ def test_generator_repairs_malformed_json() -> None:
 
     guide = generate_study_guide(provider, "Lecture 01", [_document()])
 
-    assert guide.lecture_title == "Lecture 01"
+    assert guide.lecture_overview == "The lecture introduces gradient descent."
     assert len(provider.prompts) == 2
 
 
 def test_generator_reports_schema_failure_after_repair() -> None:
-    malformed = json.dumps({"lecture_title": "Lecture 01"})
+    malformed = json.dumps({"unexpected": True})
     provider = FakeProvider([malformed, malformed])
 
     with pytest.raises(StructuredResponseError):
@@ -318,7 +326,7 @@ def test_gemini_provider_generates_structured_json(monkeypatch: pytest.MonkeyPat
         GeminiProvider(settings), "Lecture 01", [_document()]
     )
 
-    assert guide.lecture_title == "Lecture 01"
+    assert guide.lecture_overview == "The lecture introduces gradient descent."
     assert fake_models.request is not None
     assert fake_models.request["model"] == "gemini-test-model"
     config = fake_models.request["config"]
@@ -566,8 +574,9 @@ def test_service_generates_and_saves_guide_for_multiple_materials(tmp_path: Path
     guide, path = generate_lecture_study_guide(settings, lecture.id, provider=provider)
 
     assert path.name == "Study_Guide.json"
-    assert json.loads(path.read_text(encoding="utf-8"))["lecture_title"] == "Lecture 01"
-    assert guide.lecture_title == "Lecture 01"
+    saved = json.loads(path.read_text(encoding="utf-8"))
+    assert "lecture_title" not in saved
+    assert saved["lecture_overview"] == "The lecture introduces gradient descent."
     assert "filename=second.pdf" in provider.prompts[0][1]
     with pytest.raises(StudyGuideAlreadyExistsError):
         save_study_guide(settings, lecture.id, guide)

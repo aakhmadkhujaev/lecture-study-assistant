@@ -25,13 +25,28 @@ class SourceReference(BaseModel):
 class KeyConcept(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    concept: str
-    simple_explanation: str
-    important_points: list[str]
+    name: str
+    definition: str
+    explanation: str
     example: str | None = None
-    remember: str | None = None
     importance: Literal["must_know", "important", "supporting"]
+    use_when: str
+    avoid_when: str
     source_references: list[SourceReference]
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_shape(cls, value: object) -> object:
+        if not isinstance(value, dict) or "name" in value:
+            return value
+        legacy = dict(value)
+        legacy["name"] = legacy.pop("concept")
+        legacy["definition"] = legacy.pop("simple_explanation")
+        points = legacy.pop("important_points", [])
+        legacy["explanation"] = " ".join(points)
+        legacy["use_when"] = ""
+        legacy["avoid_when"] = legacy.pop("remember", "") or ""
+        return legacy
 
 
 class Definition(BaseModel):
@@ -144,21 +159,68 @@ class VisualModel(BaseModel):
         return self
 
 
+class MentalModel(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    core_idea: str = ""
+    components: list[str] = Field(default_factory=list)
+    relationships: list[str] = Field(default_factory=list)
+    how_it_works: str = ""
+    key_takeaway: str = ""
+
+
+class RealWorldApplication(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    title: str
+    problem: str
+    solution: str
+    why_this_concept: str
+    impact: str
+    source_references: list[SourceReference]
+
+
+class EngineeringConnection(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    concept: str
+    real_world_problem: str
+    engineering_decision: str
+    implementation: str
+    trade_offs: str
+    source_references: list[SourceReference]
+
+
 class StudyGuide(BaseModel):
     """Canonical structured study guide artifact."""
 
     model_config = ConfigDict(extra="forbid")
 
-    lecture_title: str
-    overview: str
-    learning_objectives: list[str]
-    key_concepts: list[KeyConcept]
-    definitions: list[Definition]
-    formulas: list[Formula]
-    exam_topics: list[ExamTopic]
-    common_confusions: list[CommonConfusion]
-    practice_questions: list[PracticeQuestion]
-    quick_revision: list[str]
-    knowledge_gaps: list[KnowledgeGap]
+    lecture_overview: str = ""
+    learning_objectives: list[str] = Field(default_factory=list)
+    mental_model: MentalModel = Field(default_factory=MentalModel)
     visual_models: list[VisualModel] = Field(default_factory=list)
-    sources: list[SourceReference]
+    key_concepts: list[KeyConcept] = Field(default_factory=list)
+    definitions: list[Definition] = Field(default_factory=list)
+    formulas: list[Formula] = Field(default_factory=list)
+    real_world_applications: list[RealWorldApplication] = Field(
+        default_factory=list, max_length=3
+    )
+    engineering_connections: list[EngineeringConnection] = Field(default_factory=list)
+    exam_topics: list[ExamTopic] = Field(default_factory=list)
+    common_confusions: list[CommonConfusion] = Field(default_factory=list)
+    practice_questions: list[PracticeQuestion] = Field(default_factory=list)
+    knowledge_gaps: list[KnowledgeGap] = Field(default_factory=list)
+    quick_revision: list[str] = Field(default_factory=list)
+    sources: list[SourceReference] = Field(default_factory=list)
+
+    @model_validator(mode="before")
+    @classmethod
+    def migrate_legacy_shape(cls, value: object) -> object:
+        if not isinstance(value, dict):
+            return value
+        migrated = dict(value)
+        if "overview" in migrated:
+            migrated.setdefault("lecture_overview", migrated.pop("overview"))
+            migrated.pop("lecture_title", None)
+        return migrated

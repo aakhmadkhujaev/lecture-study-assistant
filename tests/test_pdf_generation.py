@@ -41,6 +41,13 @@ def _guide(populated: bool = True, long_content: bool = False) -> StudyGuide:
         lecture_title="Lecture 1",
         overview=overview,
         learning_objectives=["Explain the algorithm."],
+        mental_model={
+            "core_idea": "The algorithm organizes work into repeatable steps.",
+            "components": ["Input", "Operation"],
+            "relationships": ["The operation transforms the input."],
+            "how_it_works": "Apply each step in sequence.",
+            "key_takeaway": "Understand the sequence before optimizing it.",
+        },
         key_concepts=[
             {
                 "concept": "Foundational concept",
@@ -81,6 +88,26 @@ def _guide(populated: bool = True, long_content: bool = False) -> StudyGuide:
             {
                 "formula": "O(n²)",
                 "meaning": "The lecture's stated complexity expression.",
+                "source_references": [reference],
+            }
+        ],
+        real_world_applications=[
+            {
+                "title": "Search service",
+                "problem": "Users need fast lookup in a large index.",
+                "solution": "Use the covered search strategy.",
+                "why_this_concept": "It matches the lookup requirement.",
+                "impact": "Queries return results quickly.",
+                "source_references": [reference],
+            }
+        ],
+        engineering_connections=[
+            {
+                "concept": "Search structure",
+                "real_world_problem": "A service must handle repeated lookups.",
+                "engineering_decision": "Choose the structure with the needed lookup behavior.",
+                "implementation": "Use the lecture's implementation approach.",
+                "trade_offs": "Faster lookup can require additional memory.",
                 "source_references": [reference],
             }
         ],
@@ -149,6 +176,12 @@ def test_populated_sections_priorities_questions_sources_and_unicode_render(tmp_
     for value in (
         "Lecture Overview",
         "Learning Objectives",
+        "Mental Model",
+        "Core idea",
+        "Real-World Applications",
+        "Search service",
+        "Engineering Connections",
+        "Search structure",
         "Key Concepts",
         "Important Definitions",
         "Formulas & Algorithms",
@@ -191,4 +224,4 @@ def test_existing_study_guide_json_can_be_loaded_and_rendered(tmp_path: Path) ->
     loaded_guide = StudyGuide.model_validate(json.loads(json_path.read_text(encoding="utf-8")))
     PDFService().generate(loaded_guide, output_path)
 
-    assert "Lecture 1" in _pdf_text(output_path)
+    assert "Lecture Study Guide" in _pdf_text(output_path)

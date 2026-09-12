@@ -23,6 +23,13 @@ item that has source_references in the schema must cite the source marker(s) tha
  section is empty.
 
 Section rules:
+- mental_model: structure the learner's core idea, components, relationships,
+    operation, and takeaway when the lecture supports them.
+- key_concepts: include the concept name, definition, explanation, example,
+    when-to-use judgment, when-to-avoid judgment, and importance when supported.
+- real_world_applications: include at most 3 meaningful, source-grounded applications.
+- engineering_connections: connect supported concepts to engineering problems,
+    decisions, implementation choices, and trade-offs.
 - definitions: extract a term only when the lecture defines it, explicitly describes
     what it is, or gives a clear defining characterization. Preserve the lecture's
     definition rather than substituting a textbook definition.
@@ -45,14 +52,32 @@ Section rules:
 - visual_models: generate an optional visual explanation only when it materially
     improves the learner's mental model. A visual explanation is a simple,
     source-grounded diagram of relationships, structure, flow, hierarchy, process,
-    comparison, or complexity; it is not a decorative illustration. Use only the
+    comparison, or complexity; it is not a decorative illustration. Ask: what
+    concept does this visualize, what relationship becomes easier to understand,
+    what would be harder without it, and is it more useful than repeating a
+    definition? Omit it when the answer is no. Prefer a small number of high-value
+    comparisons, algorithm processes, hierarchies, data-structure organization,
+    structure-to-operation relationships, complexity relationships, and
+    decision/trade-off models. Do not generate a generic Input -> Process -> Output
+    diagram when the lecture supports a more specific relationship. Use only the
     diagram types flow, concept_map, hierarchy, process, comparison, complexity, or
-    data_structure. Keep the number small, the diagrams readable and exam-oriented,
-    and avoid excessive nodes or relationships. Ground every node, relationship,
-    label, explanation, and source reference in the supplied material. Do not invent
-    technical details. For complexity, describe how operation count or runtime grows
+    data_structure. Generate 0-4 visuals as justified by the material; never add
+    visuals merely to reach a quota. Keep them readable and exam-oriented, with
+    few nodes and relationships. Ground every node, relationship, label,
+    explanation, and source reference in the supplied material. Do not invent
+    technical details. When the lecture compares search algorithms, data
+    structures, or complexity classes, strongly consider a visual that shows the
+    difference in strategy, operations, or growth rather than placing definitions
+    side by side. For complexity, describe how operation count or runtime grows
     as input size changes; binary search may illustrate O(log n), but it does not
-    define Big O.
+    define Big O. Do not fabricate numerical growth values or examples absent from
+    the lecture. For a data-structures-and-algorithms lecture, inspect the supplied
+    evidence for high-value opportunities such as data structure -> operations ->
+    efficiency, linear search versus binary search, Big O growth relationships,
+    or list/dict/set/tuple trade-offs. Use those patterns only when the lecture
+    explicitly supports them, and prefer them over a generic algorithm shape when
+    both are available. A generic flow is acceptable only when no more specific
+    supported relationship would improve understanding.
 
 Big O must remain precise. Use the lecture's actual explanation of growth with input
     size and its stated examples. Define each complexity class in terms of how the

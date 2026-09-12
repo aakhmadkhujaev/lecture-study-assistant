@@ -100,8 +100,6 @@ def _parse_and_validate(
         guide = StudyGuide.model_validate(payload)
     except (json.JSONDecodeError, ValidationError, TypeError) as error:
         raise StructuredResponseError(f"The AI returned invalid study-guide JSON: {error}") from error
-    if guide.lecture_title.strip() != lecture_title.strip():
-        guide = guide.model_copy(update={"lecture_title": lecture_title})
     for reference in _all_references(guide):
         key = (reference.filename, reference.source_type, reference.source_index)
         if key not in source_map:
@@ -120,6 +118,8 @@ def _all_references(guide: StudyGuide) -> Iterable[SourceReference]:
         "key_concepts",
         "definitions",
         "formulas",
+        "real_world_applications",
+        "engineering_connections",
         "exam_topics",
         "common_confusions",
         "practice_questions",
@@ -143,6 +143,8 @@ def _used_sources(guide: StudyGuide) -> list[SourceReference]:
         "key_concepts",
         "definitions",
         "formulas",
+        "real_world_applications",
+        "engineering_connections",
         "exam_topics",
         "common_confusions",
         "practice_questions",

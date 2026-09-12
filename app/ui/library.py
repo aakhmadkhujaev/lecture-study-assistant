@@ -1,5 +1,7 @@
 """Streamlit views for the course and lecture library."""
 
+from pathlib import Path
+
 import streamlit as st
 
 from config.settings import Settings
@@ -279,9 +281,29 @@ def _render_study_guide_controls(settings: Settings, lecture_id: int) -> None:
                 st.error(str(error))
             else:
                 st.success(f"PDF saved to {generated_pdf_path}.")
+        _render_pdf_download(pdf_path)
         _render_study_guide(guide)
     else:
         st.info("Generate a Study Guide before creating its PDF.")
+
+
+def _render_pdf_download(pdf_path: Path) -> None:
+    """Offer the persisted PDF for download without regenerating it."""
+    if not pdf_path.exists():
+        st.info("Generate the PDF first to download the Study Guide PDF.")
+        return
+    try:
+        pdf_bytes = pdf_path.read_bytes()
+    except OSError as error:
+        st.error(f"The Study Guide PDF could not be read: {error}")
+        return
+    st.download_button(
+        "Download Study Guide PDF",
+        data=pdf_bytes,
+        file_name="Study_Guide.pdf",
+        mime="application/pdf",
+        key=f"download-study-guide-pdf-{pdf_path}",
+    )
 
 
 def _render_material_category(
@@ -357,13 +379,16 @@ def _render_material_uploader(
 
 def _render_study_guide(guide: StudyGuide) -> None:
     """Display the structured guide without converting it to Markdown/PDF."""
-    if guide.overview.strip():
+    if guide.lecture_overview.strip():
         st.markdown("### Lecture Overview")
-        st.write(guide.overview)
+        st.write(guide.lecture_overview)
     _render_text_list("Learning Objectives", guide.learning_objectives)
+    _render_mental_model(guide)
     _render_concepts(guide)
     _render_definitions(guide)
     _render_formulas(guide)
+    _render_real_world_applications(guide)
+    _render_engineering_connections(guide)
     _render_exam_topics(guide)
     _render_confusions(guide)
     _render_questions(guide)
@@ -388,6 +413,82 @@ def _render_visual_models(guide: StudyGuide) -> None:
             _render_references(visual.source_references)
 
 
+def _render_mental_model(guide: StudyGuide) -> None:
+    mental_model = guide.mental_model
+    if not _has_meaningful_content(
+        mental_model.core_idea,
+        mental_model.components,
+        mental_model.relationships,
+        mental_model.how_it_works,
+        mental_model.key_takeaway,
+    ):
+        return
+    with st.expander("Mental Model", expanded=True):
+        if mental_model.core_idea.strip():
+            st.markdown("**Core idea**")
+            st.write(mental_model.core_idea)
+        if mental_model.components:
+            st.markdown("**Components**")
+            _render_text_list_values(mental_model.components)
+        if mental_model.relationships:
+            st.markdown("**Relationships**")
+            _render_text_list_values(mental_model.relationships)
+        if mental_model.how_it_works.strip():
+            st.markdown("**How it works**")
+            st.write(mental_model.how_it_works)
+        if mental_model.key_takeaway.strip():
+            st.markdown("**Key takeaway**")
+            st.write(mental_model.key_takeaway)
+
+
+def _render_real_world_applications(guide: StudyGuide) -> None:
+    applications = [
+        application
+        for application in guide.real_world_applications
+        if _has_meaningful_content(
+            application.title,
+            application.problem,
+            application.solution,
+            application.why_this_concept,
+            application.impact,
+        )
+    ]
+    if not applications:
+        return
+    with st.expander("Real-World Applications", expanded=True):
+        for application in applications:
+            st.markdown(f"**{application.title}**")
+            st.write(f"Problem: {application.problem}")
+            st.write(f"Solution: {application.solution}")
+            st.write(f"Why this concept: {application.why_this_concept}")
+            st.write(f"Impact: {application.impact}")
+            _render_references(application.source_references)
+
+
+def _render_engineering_connections(guide: StudyGuide) -> None:
+    connections = [
+        connection
+        for connection in guide.engineering_connections
+        if _has_meaningful_content(
+            connection.concept,
+            connection.real_world_problem,
+            connection.engineering_decision,
+            connection.implementation,
+            connection.trade_offs,
+        )
+    ]
+    if not connections:
+        return
+    with st.expander("Engineering Connections", expanded=True):
+        for connection in connections:
+            st.markdown(f"**{connection.concept}**")
+            st.write(f"Real-world problem: {connection.real_world_problem}")
+            st.write(f"Engineering decision: {connection.engineering_decision}")
+            st.write(f"Implementation: {connection.implementation}")
+            st.write(f"Trade-offs: {connection.trade_offs}")
+            _render_references(connection.source_references)
+
+
 def _render_text_list(title: str, values: list[str]) -> None:
     if not values:
         return
@@ -396,19 +497,33 @@ def _render_text_list(title: str, values: list[str]) -> None:
             st.write(f"- {value}")
 
 
+def _render_text_list_values(values: list[str]) -> None:
+    for value in values:
+        if value.strip():
+            st.write(f"- {value}")
+
+
+def _has_meaningful_content(*values: str | list[str]) -> bool:
+    return any(
+        value.strip() if isinstance(value, str) else any(item.strip() for item in value)
+        for value in values
+    )
+
+
 def _render_concepts(guide: StudyGuide) -> None:
     if not guide.key_concepts:
         return
     with st.expander("Key Concepts", expanded=True):
         for item in guide.key_concepts:
-            st.markdown(f"**{item.concept}** ({item.importance})")
-            st.write(item.simple_explanation)
-            for point in item.important_points:
-                st.write(f"- {point}")
+            st.markdown(f"**{item.name}** ({item.importance})")
+            st.write(item.definition)
+            st.write(item.explanation)
             if item.example:
                 st.write(f"Example: {item.example}")
-            if item.remember:
-                st.write(f"Remember: {item.remember}")
+            if item.use_when:
+                st.write(f"Use when: {item.use_when}")
+            if item.avoid_when:
+                st.write(f"Avoid when: {item.avoid_when}")
             _render_references(item.source_references)
 
 

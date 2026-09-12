@@ -12,12 +12,15 @@ from app.pdf.sections import (
     render_common_confusions,
     render_definitions,
     render_formulas_algorithms,
+    render_engineering_connections,
     render_key_concepts,
     render_knowledge_gaps,
     render_learning_objectives,
     render_lecture_overview,
+    render_mental_model,
     render_practice_questions,
     render_quick_revision,
+    render_real_world_applications,
     render_revision_priorities,
     render_sources,
     render_visual_models,
@@ -35,6 +38,7 @@ class PDFService:
         output_path: Path,
         course_name: str | None = None,
         overwrite: bool = False,
+        lecture_title: str | None = None,
     ) -> Path:
         if output_path.exists() and not overwrite:
             raise FileExistsError(f"The PDF already exists: {output_path}")
@@ -46,7 +50,11 @@ class PDFService:
             author="Lecture Study Assistant",
             **PAGE_MARGINS,
         )
-        document.build(_build_story(study_guide, output_path, course_name), onFirstPage=_draw_page, onLaterPages=_draw_page)
+        document.build(
+            _build_story(study_guide, output_path, course_name, lecture_title),
+            onFirstPage=_draw_page,
+            onLaterPages=_draw_page,
+        )
         return output_path
 
 
@@ -60,16 +68,21 @@ def generate_study_guide_pdf(
     return PDFService().generate(study_guide, output_path, course_name, overwrite)
 
 
-def _build_story(study_guide: StudyGuide, output_path: Path, course_name: str | None) -> list[object]:
+def _build_story(
+    study_guide: StudyGuide,
+    output_path: Path,
+    course_name: str | None,
+    lecture_title: str | None,
+) -> list[object]:
     story: list[object] = [
         paragraph("Lecture Study Guide", TITLE_STYLE),
-        paragraph(study_guide.lecture_title, SUBTITLE_STYLE),
+        paragraph(lecture_title or "Lecture Study Guide", SUBTITLE_STYLE),
     ]
     metadata = []
     if course_name:
         metadata.append([Paragraph("Course:", METADATA_LABEL_STYLE), paragraph(course_name)])
     metadata.extend([
-        [Paragraph("Lecture:", METADATA_LABEL_STYLE), paragraph(study_guide.lecture_title)],
+        [Paragraph("Lecture:", METADATA_LABEL_STYLE), paragraph(lecture_title or "Not available")],
         [Paragraph("Source material:", METADATA_LABEL_STYLE), paragraph(_source_filenames(study_guide))],
         [Paragraph("Generated study guide:", METADATA_LABEL_STYLE), paragraph(output_path.name)],
     ])
@@ -88,9 +101,12 @@ def _build_story(study_guide: StudyGuide, output_path: Path, course_name: str | 
     for renderer in (
         render_lecture_overview,
         render_learning_objectives,
+        render_mental_model,
         render_key_concepts,
         render_definitions,
         render_formulas_algorithms,
+        render_real_world_applications,
+        render_engineering_connections,
         render_revision_priorities,
         render_common_confusions,
         render_practice_questions,

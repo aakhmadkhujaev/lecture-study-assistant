@@ -30,4 +30,5 @@ def generate_lecture_study_guide_pdf(
         study_guide_pdf_path(settings, lecture_id),
         course.name,
         overwrite,
+        lecture.title,
     )
